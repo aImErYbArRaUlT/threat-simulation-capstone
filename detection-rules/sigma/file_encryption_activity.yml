@@ -1,0 +1,148 @@
+title: Rapid File Encryption Activity
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: experimental
+description: >
+  Detects rapid sequential file rename or write operations with encrypted file
+  extensions, characteristic of ransomware-style encryption behavior.
+  Based on threat simulation capstone behavioral analysis.
+author: Threat Simulation Capstone — Detection Engineering
+date: 2026-06-19
+references:
+  - https://attack.mitre.org/techniques/T1486/
+tags:
+  - attack.impact
+  - attack.t1486
+logsource:
+  category: file_event
+  product: linux
+detection:
+  selection:
+    TargetFilename|endswith:
+      - '.encrypted'
+      - '.locked'
+      - '.enc'
+  timeframe: 60s
+  condition: selection | count() by Image > 50
+falsepositives:
+  - Backup software performing bulk archive operations
+  - Legitimate encryption tools (VeraCrypt, gpg bulk operations)
+level: high
+---
+title: C2 Registration API Call
+id: b2c3d4e5-f6a7-8901-bcde-f12345678901
+status: experimental
+description: >
+  Detects HTTP POST to /api/register endpoint pattern consistent with
+  threat simulation C2 registration. Also applicable to real-world C2
+  frameworks using similar REST registration patterns.
+author: Threat Simulation Capstone — Detection Engineering
+date: 2026-06-19
+references:
+  - https://attack.mitre.org/techniques/T1071/001/
+tags:
+  - attack.command-and-control
+  - attack.t1071.001
+logsource:
+  category: network_connection
+  product: linux
+detection:
+  selection:
+    DestinationPort: 5000
+    Initiated: 'true'
+  uri_pattern:
+    cs-uri-stem|contains:
+      - '/api/register'
+      - '/api/exfiltrate'
+      - '/api/command'
+  condition: selection or uri_pattern
+falsepositives:
+  - Internal development APIs running on port 5000
+  - Flask development servers
+level: medium
+---
+title: Anti-Debug ptrace Detection Attempt
+id: c3d4e5f6-a7b8-9012-cdef-123456789012
+status: experimental
+description: >
+  Detects a process calling ptrace(PTRACE_TRACEME) on itself, which is a
+  common anti-debug technique. A process tracing itself prevents an external
+  debugger from attaching.
+author: Threat Simulation Capstone — Detection Engineering
+date: 2026-06-19
+references:
+  - https://attack.mitre.org/techniques/T1622/
+tags:
+  - attack.defense-evasion
+  - attack.t1622
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection:
+    Syscall: 'ptrace'
+    a0: '0'    # PTRACE_TRACEME
+  condition: selection
+falsepositives:
+  - Legitimate debuggers and profilers
+  - Some JVM implementations
+level: low
+---
+title: Privilege Escalation via SUID Binary
+id: d4e5f6a7-b8c9-0123-defa-234567890123
+status: experimental
+description: >
+  Detects execution of known vulnerable SUID binaries used for local privilege
+  escalation. Covers CVE-2021-4034 (pkexec/PwnKit) and similar vectors.
+author: Threat Simulation Capstone — Detection Engineering
+date: 2026-06-19
+references:
+  - https://attack.mitre.org/techniques/T1068/
+  - https://nvd.nist.gov/vuln/detail/CVE-2021-4034
+tags:
+  - attack.privilege-escalation
+  - attack.t1068
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection_pkexec:
+    Image|endswith: '/pkexec'
+    ParentImage|endswith:
+      - '/bash'
+      - '/sh'
+      - '/dash'
+  selection_uid_change:
+    NewProcessName|endswith: '/pkexec'
+    User|contains: 'root'
+  condition: selection_pkexec or selection_uid_change
+falsepositives:
+  - Legitimate PolicyKit usage (GUI authentication dialogs)
+level: high
+---
+title: Key Exfiltration HTTP POST
+id: e5f6a7b8-c9d0-1234-efab-345678901234
+status: experimental
+description: >
+  Detects large HTTP POST to C2 endpoint consistent with encrypted key
+  exfiltration. The simulation sends RSA-wrapped AES keys per file
+  encrypted, producing characteristic payload sizes.
+author: Threat Simulation Capstone — Detection Engineering
+date: 2026-06-19
+references:
+  - https://attack.mitre.org/techniques/T1041/
+tags:
+  - attack.exfiltration
+  - attack.t1041
+logsource:
+  category: network_connection
+  product: linux
+detection:
+  selection:
+    DestinationPort: 5000
+    cs-method: 'POST'
+    cs-uri-stem|contains: '/api/exfiltrate'
+    sc-bytes|gt: 10000
+  condition: selection
+falsepositives:
+  - Large legitimate API payloads on port 5000
+level: high
